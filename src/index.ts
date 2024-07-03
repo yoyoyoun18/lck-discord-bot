@@ -48,6 +48,39 @@ client.once("ready", () => {
     await scrapeAndSaveLCKSchedule();
     console.log("LCK 일정이 업데이트되었습니다.");
   });
+
+  cron.schedule("0 13 * * *", async () => {
+    const channelId = "YOUR_CHANNEL_ID"; // 메시지를 보낼 디스코드 채널 ID
+    const channel = client.channels.cache.get(channelId) as TextChannel;
+    if (!channel) {
+      console.error("채널을 찾을 수 없습니다!");
+      return;
+    }
+
+    const schedule = loadLCKSchedule();
+    const today = getFormattedDate();
+
+    // 일정 필터링
+    const filteredSchedule = schedule.filter((game) => game.date === today);
+
+    // 일정 메시지 생성
+    const lckMessage =
+      filteredSchedule.length > 0
+        ? filteredSchedule
+            .map(
+              (game) =>
+                `@here\n${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
+            )
+            .join("\n")
+        : `@here\n${today} 경기가 없습니다.`;
+
+    // 메시지 길이 확인
+    if (lckMessage.length > 2000) {
+      await channel.send("LCK 일정이 너무 길어 표시할 수 없습니다.");
+    } else {
+      await channel.send(lckMessage);
+    }
+  });
 });
 
 client.on("messageCreate", async (message) => {
@@ -67,10 +100,10 @@ client.on("messageCreate", async (message) => {
         ? filteredSchedule
             .map(
               (game) =>
-                `@here\n${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
+                `n${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
             )
             .join("\n")
-        : `@here\n${today} 경기가 없습니다.`;
+        : `${today} 경기가 없습니다.`;
 
     // const endTime = Date.now();
     // const responseTime = (endTime - startTime).toString();
