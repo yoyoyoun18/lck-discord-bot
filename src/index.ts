@@ -1,9 +1,17 @@
 import { Client, GatewayIntentBits, TextChannel } from "discord.js";
 import * as dotenv from "dotenv";
-import { scrapeLCKSchedule } from "./crawler";
+import fs from "fs";
+import path from "path";
 import cron from "node-cron";
+import { scrapeAndSaveLCKSchedule } from "./scrapeAndSaveLCKSchedule";
 
 dotenv.config();
+
+interface ScheduleItem {
+  date: string;
+  teams: string[];
+  time: string;
+}
 
 function getFormattedDate(): string {
   const date = new Date();
@@ -12,6 +20,16 @@ function getFormattedDate(): string {
   const days = ["일", "월", "화", "수", "목", "금", "토"];
   const dayOfWeek = days[date.getDay()]; // 요일 가져오기
   return `${month}월 ${day}일 (${dayOfWeek})`;
+}
+
+function loadLCKSchedule(): ScheduleItem[] {
+  const filePath = path.join(__dirname, "lckSchedule.json");
+  if (fs.existsSync(filePath)) {
+    const fileContents = fs.readFileSync(filePath, "utf8");
+    return JSON.parse(fileContents);
+  } else {
+    return [];
+  }
 }
 
 const client = new Client({
@@ -25,37 +43,10 @@ const client = new Client({
 client.once("ready", () => {
   console.log("Bot is online!");
 
-  // 특정 시간에 메시지 보내기 (예: 매일 오전 9시에 메시지 보내기)
-  cron.schedule("0 13 * * *", async () => {
-    const schedule = await scrapeLCKSchedule();
-    const today = getFormattedDate();
-
-    // 일정 필터링
-    const filteredSchedule = schedule.filter((game) => game.date === today);
-
-    // 일정 메시지 생성
-    const lckMessage =
-      filteredSchedule.length > 0
-        ? filteredSchedule
-            .map(
-              (game) =>
-                `@here \n${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
-            )
-            .join("\n")
-        : `@here \n${today} 경기가 없습니다.`;
-
-    // 메시지 보낼 채널 ID
-    const channelId = "1257854609850896468"; // 메시지를 보낼 디스코드 채널 ID
-    const channel = client.channels.cache.get(channelId) as TextChannel;
-    if (channel) {
-      if (lckMessage.length > 2000) {
-        channel.send("LCK 일정이 너무 길어 표시할 수 없습니다.");
-      } else {
-        channel.send(lckMessage);
-      }
-    } else {
-      console.error("채널을 찾을 수 없습니다!");
-    }
+  // 한 달에 한 번 크롤링하여 데이터 저장 (예: 매월 1일 00:00에 실행)
+  cron.schedule("0 0 1 * *", async () => {
+    await scrapeAndSaveLCKSchedule();
+    console.log("LCK 일정이 업데이트되었습니다.");
   });
 });
 
@@ -63,7 +54,8 @@ client.on("messageCreate", async (message) => {
   if (message.content === "!ping") {
     message.channel.send("Pong!");
   } else if (message.content === "!lck") {
-    const schedule = await scrapeLCKSchedule();
+    // const startTime = Date.now();
+    const schedule = loadLCKSchedule();
     const today = getFormattedDate();
 
     // 일정 필터링
@@ -75,16 +67,20 @@ client.on("messageCreate", async (message) => {
         ? filteredSchedule
             .map(
               (game) =>
-                `@here \n${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
+                `${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
             )
             .join("\n")
-        : `@here \n${today} 경기가 없습니다.`;
+        : `${today} 경기가 없습니다.`;
+
+    // const endTime = Date.now();
+    // const responseTime = (endTime - startTime).toString();
 
     // 메시지 길이 확인
     if (lckMessage.length > 2000) {
-      message.channel.send("LCK 일정이 너무 길어 표시할 수 없습니다.");
+      await message.channel.send("LCK 일정이 너무 길어 표시할 수 없습니다.");
     } else {
-      message.channel.send(lckMessage);
+      await message.channel.send(lckMessage);
+      //   await message.channel.send(`응답 시간: ${responseTime}ms`);
     }
   }
 });
