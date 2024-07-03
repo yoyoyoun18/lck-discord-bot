@@ -67,10 +67,10 @@ client.on("messageCreate", async (message) => {
         ? filteredSchedule
             .map(
               (game) =>
-                `${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
+                `@here\n${game.date} \n\n${game.teams[0]} vs ${game.teams[1]}\n${game.teams[2]} vs ${game.teams[3]}\n`
             )
             .join("\n")
-        : `${today} 경기가 없습니다.`;
+        : `@here\n${today} 경기가 없습니다.`;
 
     // const endTime = Date.now();
     // const responseTime = (endTime - startTime).toString();
